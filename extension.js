@@ -1,10 +1,8 @@
 const vscode = require('vscode');
 
-function activate(context) 
-{
+function activate(context) {
 
-    let disposable = vscode.commands.registerCommand('extension.generateGetterAndSetters', function () 
-    {
+    let disposable = vscode.commands.registerCommand('extension.generateGetterAndSetters', function () {
         var editor = vscode.window.activeTextEditor;
         if (!editor)
             return; // No open text editor
@@ -12,30 +10,26 @@ function activate(context)
         var selection = editor.selection;
         var text = editor.document.getText(selection);
 
-        if (text.length < 1)
-        {
+        if (text.length < 1) {
             vscode.window.showErrorMessage('No selected properties.');
             return;
         }
 
-        try 
-        {
+        try {
             var getterAndSetter = createGetterAndSetter(text);
 
             editor.edit(
                 edit => editor.selections.forEach(
-                  selection => 
-                  {
-                    edit.insert(selection.end, getterAndSetter);
-                  }
+                    selection => {
+                        edit.insert(selection.end, getterAndSetter);
+                    }
                 )
-              );
+            );
 
             // format getterAndSetter
             vscode.commands.executeCommand('editor.action.formatSelection');
-        } 
-        catch (error) 
-        {
+        }
+        catch (error) {
             console.log(error);
             vscode.window.showErrorMessage('Something went wrong! Try that the properties are in this format: "private String name;"');
         }
@@ -44,29 +38,25 @@ function activate(context)
     context.subscriptions.push(disposable);
 }
 
-function toPascalCase(str) 
-{
-    return str.replace(/\w+/g,w => w[0].toUpperCase() + w.slice(1));
+function toPascalCase(str) {
+    return str.replace(/\w+/g, w => w[0].toUpperCase() + w.slice(1));
 }
 
-function createGetterAndSetter(textPorperties)
-{
+function createGetterAndSetter(textPorperties) {
     var properties = textPorperties.split(/\r?\n/).filter(x => x.length > 2).map(x => x.replace(';', ''));
 
     var generatedCode = `
 `;
-    for (let p of properties) 
-    {
+    for (let p of properties) {
         while (p.startsWith(" ")) p = p.substr(1);
         while (p.startsWith("\t")) p = p.substr(1);
 
         let words = p.split(" ").map(x => x.replace(/\r?\n/, ''));
         let type, attribute, Attribute = "";
         let create = false;
-        
+
         // if words == ["private", "String", "name"];
-        if (words.length > 2)
-        {
+        if (words.length > 2) {
             type = words[1];
             attribute = words[2];
             Attribute = toPascalCase(words[2]);
@@ -74,29 +64,29 @@ function createGetterAndSetter(textPorperties)
             create = true;
         }
         // if words == ["String", "name"];
-        else if (words.length == 2)
-        {
+        else if (words.length == 2) {
             type = words[0];
             attribute = words[1];
             Attribute = toPascalCase(words[1]);
-            
-            create = true;            
+
+            create = true;
         }
         // if words == ["name"];
-        else if (words.length)
-        {
+        else if (words.length) {
             type = "Object";
             attribute = words[0];
             Attribute = toPascalCase(words[0]);
-            
-            create = true;            
+
+            create = true;
         }
 
-        if (create)
-        {
+        if (create) {
+            let editor = vscode.window.activeTextEditor;
+            let languageId = editor.document.languageId;
+            if (languageId === 'java') {
 
-            let code = 
-`
+                let code =
+                    `
 \tpublic ${type} ${type.startsWith('bool') ? 'is' : 'get'}${Attribute}() {
 \t\treturn this.${attribute};
 \t}
@@ -105,7 +95,21 @@ function createGetterAndSetter(textPorperties)
 \t\tthis.${attribute} = ${attribute};
 \t}
 `;
-            generatedCode += code;
+                generatedCode += code;
+            }
+            else if (languageId === 'cpp') {
+                let code =
+                    `
+${type} ${type.startsWith('bool') ? 'is' : 'get'}${Attribute}() {
+\t\treturn this.${attribute};
+\t}
+
+void set${Attribute}(${type} ${attribute}) {
+\t\tthis.${attribute} = ${attribute};
+\t}
+`;
+                generatedCode += code;
+            }
         }
     }
 
